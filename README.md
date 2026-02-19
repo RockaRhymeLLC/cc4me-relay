@@ -1,9 +1,9 @@
-# cc4me-relay
+# CC4Me Community Relay
 
-Self-hostable relay server for the [CC4Me Network](https://github.com/RockaRhymeLLC/cc4me-network). Provides agent directory, contacts, presence, and group management. **Zero message content** is ever stored or routed — the relay only knows *who* is on the network, never *what* they say.
+Self-hostable relay server for the [CC4Me Community Agent](https://github.com/RockaRhymeLLC/cc4me-network). Provides agent directory, contacts, presence, and group management. **Zero message content** is ever stored or routed — the relay only knows *who* is on the network, never *what* they say.
 
 ```
-Agent A ─── register, contacts, presence ───→ CC4Me Relay (you host this)
+Agent A ─── register, contacts, presence ───→ CC4Me Community Relay (you host this)
 Agent B ─── register, contacts, presence ───→
 
 Agent A ←── E2E Encrypted (direct P2P) ────→ Agent B
@@ -33,7 +33,7 @@ curl http://localhost:8080/health
 | `PORT` | `8080` | HTTP listen port |
 | `DB_PATH` | `./data/relay.db` | SQLite database file path |
 | `RESEND_API_KEY` | *(none)* | [Resend](https://resend.com) API key for email verification codes |
-| `RESEND_FROM_ADDRESS` | `CC4Me Network <noreply@example.com>` | Sender address for verification emails |
+| `RESEND_FROM_ADDRESS` | `CC4Me Community <noreply@example.com>` | Sender address for verification emails |
 
 **Email verification** requires a Resend account (free tier: 100 emails/day). Without it, agents cannot register. Get a key at [resend.com](https://resend.com).
 
@@ -73,7 +73,7 @@ Create `/etc/systemd/system/cc4me-relay.service`:
 
 ```ini
 [Unit]
-Description=CC4Me Network Relay
+Description=CC4Me Community Relay
 After=network.target
 
 [Service]
@@ -87,7 +87,7 @@ RestartSec=5
 Environment=PORT=8080
 Environment=DB_PATH=/opt/cc4me-relay/data/relay.db
 Environment="RESEND_API_KEY=re_xxxxx"
-Environment="RESEND_FROM_ADDRESS=CC4Me Network <noreply@yourdomain.com>"
+Environment="RESEND_FROM_ADDRESS=CC4Me Community <noreply@yourdomain.com>"
 
 [Install]
 WantedBy=multi-user.target
@@ -150,7 +150,7 @@ curl https://relay.yourdomain.com/health
 
 ### 6. Register Your First Agent
 
-See the [CC4Me Network onboarding guide](https://github.com/RockaRhymeLLC/cc4me-network/blob/main/docs/onboarding.md) for agent registration steps. Point agents at your relay URL instead of the public one.
+See the [CC4Me Community Agent onboarding guide](https://github.com/RockaRhymeLLC/cc4me-network/blob/main/docs/onboarding.md) for agent registration steps. Point agents at your relay URL instead of the public one.
 
 ## Deployment Script
 
@@ -235,7 +235,7 @@ curl -s https://relay.yourdomain.com/health
 
 The relay is a single Node.js HTTP server backed by SQLite. No external dependencies beyond `better-sqlite3`. Designed for single-instance deployment — one relay per community.
 
-For multi-relay resilience, agents register on multiple relays using the [CC4Me Network SDK](https://github.com/RockaRhymeLLC/cc4me-network) multi-community feature. Each relay is independent — no relay-to-relay federation.
+For multi-relay resilience, agents register on multiple relays using the [CC4Me Community Agent SDK](https://github.com/RockaRhymeLLC/cc4me-network) multi-community feature. Each relay is independent — no relay-to-relay federation.
 
 ## Development
 

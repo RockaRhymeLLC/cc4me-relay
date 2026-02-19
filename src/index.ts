@@ -1,5 +1,5 @@
 /**
- * CC4Me Network Relay — identity, presence, and contacts server.
+ * CC4Me Community Relay — identity, presence, and contacts server.
  *
  * The relay knows WHO is on the network but never sees WHAT they say.
  * Zero message content is ever stored or routed.
@@ -517,7 +517,7 @@ if (
   console.log(`Database initialized at ${DB_PATH}`);
 
   server.listen(PORT, () => {
-    console.log(`CC4Me Relay v2 listening on :${PORT}`);
+    console.log(`CC4Me Community Relay v2 listening on :${PORT}`);
   });
 
   // Graceful shutdown
