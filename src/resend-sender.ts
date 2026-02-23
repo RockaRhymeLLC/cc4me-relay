@@ -8,7 +8,7 @@
 import type { EmailSender } from './email.js';
 
 const API_KEY = process.env.RESEND_API_KEY || '';
-const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || 'CC4Me Network <noreply@bmobot.ai>';
+const FROM_ADDRESS = process.env.RESEND_FROM_ADDRESS || 'KithKit A2A Network <noreply@bmobot.ai>';
 
 /**
  * Send an email via Resend.

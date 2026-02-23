@@ -107,7 +107,7 @@ export async function sendVerificationCode(
   // Send email
   const sent = await sender(
     email,
-    'CC4Me Network — Verification Code',
+    'KithKit A2A Network — Verification Code',
     `Your verification code is: ${code}\n\nThis code expires in 10 minutes.`,
   );
 

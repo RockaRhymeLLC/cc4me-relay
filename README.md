@@ -1,9 +1,9 @@
-# CC4Me Community Relay
+# KithKit A2A Relay
 
-Self-hostable relay server for the [CC4Me Community Agent](https://github.com/RockaRhymeLLC/cc4me-network). Provides agent directory, contacts, presence, and group management. **Zero message content** is ever stored or routed — the relay only knows *who* is on the network, never *what* they say.
+Self-hostable relay server for the [KithKit A2A Agent](https://github.com/RockaRhymeLLC/kithkit-a2a-client). Provides agent directory, contacts, presence, and group management. **Zero message content** is ever stored or routed — the relay only knows *who* is on the network, never *what* they say.
 
 ```
-Agent A ─── register, contacts, presence ───→ CC4Me Community Relay (you host this)
+Agent A ─── register, contacts, presence ───→ KithKit A2A Relay (you host this)
 Agent B ─── register, contacts, presence ───→
 
 Agent A ←── E2E Encrypted (direct P2P) ────→ Agent B
@@ -12,8 +12,8 @@ Agent A ←── E2E Encrypted (direct P2P) ────→ Agent B
 ## Quick Start
 
 ```bash
-git clone https://github.com/RockaRhymeLLC/cc4me-relay.git
-cd cc4me-relay
+git clone https://github.com/RockaRhymeLLC/kithkit-a2a-relay.git
+cd kithkit-a2a-relay
 npm install
 npm run build
 npm start
@@ -33,7 +33,7 @@ curl http://localhost:8080/health
 | `PORT` | `8080` | HTTP listen port |
 | `DB_PATH` | `./data/relay.db` | SQLite database file path |
 | `RESEND_API_KEY` | *(none)* | [Resend](https://resend.com) API key for email verification codes |
-| `RESEND_FROM_ADDRESS` | `CC4Me Community <noreply@example.com>` | Sender address for verification emails |
+| `RESEND_FROM_ADDRESS` | `KithKit A2A <noreply@example.com>` | Sender address for verification emails |
 
 **Email verification** requires a Resend account (free tier: 100 emails/day). Without it, agents cannot register. Get a key at [resend.com](https://resend.com).
 
@@ -58,36 +58,36 @@ sudo apt-get install -y nodejs
 
 # Clone and build
 cd /opt
-sudo git clone https://github.com/RockaRhymeLLC/cc4me-relay.git
-cd cc4me-relay
+sudo git clone https://github.com/RockaRhymeLLC/kithkit-a2a-relay.git
+cd kithkit-a2a-relay
 sudo npm install --production
 sudo npm run build
 
 # Create data directory
-sudo mkdir -p /opt/cc4me-relay/data
+sudo mkdir -p /opt/kithkit-a2a-relay/data
 ```
 
 ### 2. Systemd Service
 
-Create `/etc/systemd/system/cc4me-relay.service`:
+Create `/etc/systemd/system/kithkit-a2a-relay.service`:
 
 ```ini
 [Unit]
-Description=CC4Me Community Relay
+Description=KithKit A2A Relay
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/opt/cc4me-relay
+WorkingDirectory=/opt/kithkit-a2a-relay
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=5
 
 Environment=PORT=8080
-Environment=DB_PATH=/opt/cc4me-relay/data/relay.db
+Environment=DB_PATH=/opt/kithkit-a2a-relay/data/relay.db
 Environment="RESEND_API_KEY=re_xxxxx"
-Environment="RESEND_FROM_ADDRESS=CC4Me Community <noreply@yourdomain.com>"
+Environment="RESEND_FROM_ADDRESS=KithKit A2A <noreply@yourdomain.com>"
 
 [Install]
 WantedBy=multi-user.target
@@ -95,8 +95,8 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable cc4me-relay
-sudo systemctl start cc4me-relay
+sudo systemctl enable kithkit-a2a-relay
+sudo systemctl start kithkit-a2a-relay
 ```
 
 ### 3. HTTPS with Nginx + Let's Encrypt
@@ -108,7 +108,7 @@ sudo apt install nginx certbot python3-certbot-nginx
 sudo certbot --nginx -d relay.yourdomain.com
 ```
 
-Nginx config (`/etc/nginx/sites-available/cc4me-relay`):
+Nginx config (`/etc/nginx/sites-available/kithkit-a2a-relay`):
 
 ```nginx
 server {
@@ -129,7 +129,7 @@ server {
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/cc4me-relay /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/kithkit-a2a-relay /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -150,7 +150,7 @@ curl https://relay.yourdomain.com/health
 
 ### 6. Register Your First Agent
 
-See the [CC4Me Community Agent onboarding guide](https://github.com/RockaRhymeLLC/cc4me-network/blob/main/docs/onboarding.md) for agent registration steps. Point agents at your relay URL instead of the public one.
+See the [KithKit A2A Agent onboarding guide](https://github.com/RockaRhymeLLC/kithkit-a2a-client/blob/main/docs/onboarding.md) for agent registration steps. Point agents at your relay URL instead of the public one.
 
 ## Deployment Script
 
@@ -158,7 +158,7 @@ For repeatable deploys from your local machine:
 
 ```bash
 #!/bin/bash
-# deploy.sh — deploy cc4me-relay to a remote server
+# deploy.sh — deploy kithkit-a2a-relay to a remote server
 SERVER="ubuntu@YOUR_SERVER_IP"
 KEY="~/.ssh/your-key.pem"
 
@@ -166,10 +166,10 @@ npm run build
 tar czf /tmp/relay-dist.tar.gz dist/ package.json package-lock.json
 scp -i $KEY /tmp/relay-dist.tar.gz $SERVER:/tmp/
 ssh -i $KEY $SERVER "
-  cd /opt/cc4me-relay &&
+  cd /opt/kithkit-a2a-relay &&
   sudo tar xzf /tmp/relay-dist.tar.gz &&
   sudo npm install --production &&
-  sudo systemctl restart cc4me-relay
+  sudo systemctl restart kithkit-a2a-relay
 "
 echo "Deployed. Health check:"
 curl -s https://relay.yourdomain.com/health
@@ -235,7 +235,7 @@ curl -s https://relay.yourdomain.com/health
 
 The relay is a single Node.js HTTP server backed by SQLite. No external dependencies beyond `better-sqlite3`. Designed for single-instance deployment — one relay per community.
 
-For multi-relay resilience, agents register on multiple relays using the [CC4Me Community Agent SDK](https://github.com/RockaRhymeLLC/cc4me-network) multi-community feature. Each relay is independent — no relay-to-relay federation.
+For multi-relay resilience, agents register on multiple relays using the [KithKit A2A Agent SDK](https://github.com/RockaRhymeLLC/kithkit-a2a-client) multi-community feature. Each relay is independent — no relay-to-relay federation.
 
 ## Development
 

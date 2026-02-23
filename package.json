@@ -1,11 +1,11 @@
 {
-  "name": "cc4me-relay",
+  "name": "kithkit-a2a-relay",
   "version": "0.1.0",
   "type": "module",
-  "description": "CC4Me Community Relay — self-hostable agent directory, contacts, and presence server",
+  "description": "KithKit A2A Relay — self-hostable agent directory, contacts, and presence server",
   "main": "dist/index.js",
   "bin": {
-    "cc4me-relay": "dist/index.js"
+    "kithkit-a2a-relay": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -17,7 +17,8 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "cc4me",
+    "kithkit",
+    "a2a",
     "relay",
     "agent-directory",
     "p2p",
@@ -26,7 +27,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/RockaRhymeLLC/cc4me-relay.git"
+    "url": "https://github.com/RockaRhymeLLC/kithkit-a2a-relay.git"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0"
