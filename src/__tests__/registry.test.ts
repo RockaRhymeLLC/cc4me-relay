@@ -21,6 +21,7 @@ import {
   listAgents,
   getAgent,
   lookupAgent,
+  updateAgentEmail,
 } from '../routes/registry.js';
 import { listPendingRegistrations, listAdminKeys, listBroadcasts } from '../routes/admin.js';
 
@@ -712,6 +713,222 @@ describe('t-099: Directory lookup omits endpoint from response', () => {
     assert.equal(result.createdAt, undefined, 'createdAt should not be in response');
     assert.equal(result.approvedBy, undefined, 'approvedBy should not be in response');
 
+    db.close();
+  });
+});
+
+// ================================================================
+// PUT /registry/agents/:name/email — update agent owner email
+// ================================================================
+
+describe('updateAgentEmail: agent self-update with verification', () => {
+  let cleanupDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of cleanupDirs) rmSync(dir, { recursive: true, force: true });
+    cleanupDirs = [];
+  });
+
+  function withDb() {
+    const { db, dir } = setupDb();
+    cleanupDirs.push(dir);
+    return db;
+  }
+
+  it('rejects missing email', () => {
+    const db = withDb();
+    const result = updateAgentEmail(db, 'bmo', '', 'bmo');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error!, /email is required/i);
+    db.close();
+  });
+
+  it('rejects invalid email format', () => {
+    const db = withDb();
+    const result = updateAgentEmail(db, 'bmo', 'not-an-email', 'bmo');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error!, /invalid email/i);
+    db.close();
+  });
+
+  it('rejects disposable email domain', () => {
+    const db = withDb();
+    const agent = genKeypair();
+    verifyEmail(db, 'bmo', 'bmo@example.com');
+    registerAgent(db, 'bmo', agent.publicKeyBase64, 'bmo@example.com', '');
+
+    const result = updateAgentEmail(db, 'bmo', 'bmo@mailinator.com', 'bmo');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error!, /disposable/i);
+    db.close();
+  });
+
+  it('returns 404 for non-existent agent', () => {
+    const db = withDb();
+    const result = updateAgentEmail(db, 'ghost', 'new@example.com', 'ghost');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 404);
+    db.close();
+  });
+
+  it('returns 403 for revoked agent', () => {
+    const db = withDb();
+    const admin = genKeypair();
+    const agent = genKeypair();
+    seedAdmins(db, [{ name: 'admin', publicKeyBase64: admin.publicKeyBase64 }]);
+    verifyEmail(db, 'rogue', 'rogue@example.com');
+    registerAgent(db, 'rogue', agent.publicKeyBase64, 'rogue@example.com', '');
+    revokeAgent(db, 'rogue', 'admin');
+
+    const result = updateAgentEmail(db, 'rogue', 'new@example.com', 'rogue');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 403);
+    db.close();
+  });
+
+  it('no-op when email is same as current', () => {
+    const db = withDb();
+    const agent = genKeypair();
+    verifyEmail(db, 'bmo', 'bmo@example.com');
+    registerAgent(db, 'bmo', agent.publicKeyBase64, 'bmo@example.com', '');
+
+    const result = updateAgentEmail(db, 'bmo', 'bmo@example.com', 'bmo');
+    assert.equal(result.ok, true);
+    assert.equal(result.email, 'bmo@example.com');
+    db.close();
+  });
+
+  it('rejects duplicate email (another agent already uses it)', () => {
+    const db = withDb();
+    const agentA = genKeypair();
+    const agentB = genKeypair();
+    verifyEmail(db, 'agent-a', 'a@example.com');
+    registerAgent(db, 'agent-a', agentA.publicKeyBase64, 'a@example.com', '');
+    verifyEmail(db, 'agent-b', 'b@example.com');
+    registerAgent(db, 'agent-b', agentB.publicKeyBase64, 'b@example.com', '');
+
+    const result = updateAgentEmail(db, 'agent-b', 'a@example.com', 'agent-b');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 409);
+    assert.match(result.error!, /email/i);
+    db.close();
+  });
+
+  it('rejects self-update without verification for new email', () => {
+    const db = withDb();
+    const agent = genKeypair();
+    verifyEmail(db, 'bmo', 'bmo@example.com');
+    registerAgent(db, 'bmo', agent.publicKeyBase64, 'bmo@example.com', '');
+
+    const result = updateAgentEmail(db, 'bmo', 'new@example.com', 'bmo');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.equal(result.verificationRequired, true);
+    assert.match(result.error!, /not verified/i);
+    db.close();
+  });
+
+  it('allows self-update after new email is verified', () => {
+    const db = withDb();
+    const agent = genKeypair();
+    verifyEmail(db, 'bmo', 'bmo@example.com');
+    registerAgent(db, 'bmo', agent.publicKeyBase64, 'bmo@example.com', '');
+
+    // Verify the new email
+    verifyEmail(db, 'bmo', 'new@example.com');
+
+    const result = updateAgentEmail(db, 'bmo', 'new@example.com', 'bmo');
+    assert.equal(result.ok, true);
+    assert.equal(result.email, 'new@example.com');
+
+    // Confirm in database
+    const updated = getAgent(db, 'bmo');
+    assert.equal(updated?.ownerEmail, 'new@example.com');
+    db.close();
+  });
+
+  it('rejects non-owner non-admin trying to update another agent email', () => {
+    const db = withDb();
+    const agentA = genKeypair();
+    const agentB = genKeypair();
+    verifyEmail(db, 'agent-a', 'a@example.com');
+    registerAgent(db, 'agent-a', agentA.publicKeyBase64, 'a@example.com', '');
+    verifyEmail(db, 'agent-b', 'b@example.com');
+    registerAgent(db, 'agent-b', agentB.publicKeyBase64, 'b@example.com', '');
+
+    const result = updateAgentEmail(db, 'agent-a', 'updated@example.com', 'agent-b');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 403);
+    assert.match(result.error!, /own email/i);
+    db.close();
+  });
+});
+
+describe('updateAgentEmail: admin override', () => {
+  let cleanupDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of cleanupDirs) rmSync(dir, { recursive: true, force: true });
+    cleanupDirs = [];
+  });
+
+  function withDb() {
+    const { db, dir } = setupDb();
+    cleanupDirs.push(dir);
+    return db;
+  }
+
+  it('admin can update any agent email without verification', () => {
+    const db = withDb();
+    const admin = genKeypair();
+    const agent = genKeypair();
+    seedAdmins(db, [{ name: 'admin', publicKeyBase64: admin.publicKeyBase64 }]);
+    verifyEmail(db, 'bmo', 'bmo@example.com');
+    registerAgent(db, 'bmo', agent.publicKeyBase64, 'bmo@example.com', '');
+
+    // Admin updates bmo's email — no verification needed
+    const result = updateAgentEmail(db, 'bmo', 'new-bmo@example.com', 'admin');
+    assert.equal(result.ok, true);
+    assert.equal(result.email, 'new-bmo@example.com');
+
+    // Confirm in database
+    const updated = getAgent(db, 'bmo');
+    assert.equal(updated?.ownerEmail, 'new-bmo@example.com');
+    db.close();
+  });
+
+  it('admin update also rejects disposable email', () => {
+    const db = withDb();
+    const admin = genKeypair();
+    const agent = genKeypair();
+    seedAdmins(db, [{ name: 'admin', publicKeyBase64: admin.publicKeyBase64 }]);
+    verifyEmail(db, 'bmo', 'bmo@example.com');
+    registerAgent(db, 'bmo', agent.publicKeyBase64, 'bmo@example.com', '');
+
+    const result = updateAgentEmail(db, 'bmo', 'bmo@guerrillamail.com', 'admin');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error!, /disposable/i);
+    db.close();
+  });
+
+  it('admin update rejects duplicate email', () => {
+    const db = withDb();
+    const admin = genKeypair();
+    const agentA = genKeypair();
+    const agentB = genKeypair();
+    seedAdmins(db, [{ name: 'admin', publicKeyBase64: admin.publicKeyBase64 }]);
+    verifyEmail(db, 'agent-a', 'a@example.com');
+    registerAgent(db, 'agent-a', agentA.publicKeyBase64, 'a@example.com', '');
+    verifyEmail(db, 'agent-b', 'b@example.com');
+    registerAgent(db, 'agent-b', agentB.publicKeyBase64, 'b@example.com', '');
+
+    const result = updateAgentEmail(db, 'agent-b', 'a@example.com', 'admin');
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 409);
     db.close();
   });
 });

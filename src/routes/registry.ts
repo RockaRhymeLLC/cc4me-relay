@@ -4,6 +4,7 @@
  * POST /registry/agents          — Register (requires prior email verification)
  * GET  /registry/agents          — List all agents (public directory)
  * GET  /registry/agents/:name    — Get single agent details
+ * PUT  /registry/agents/:name/email — Update agent's owner email
  * POST /registry/agents/:name/approve — Admin: approve pending agent
  * POST /registry/agents/:name/revoke  — Admin: revoke agent
  */
@@ -369,4 +370,104 @@ export function recoverKey(
   ).run(newPublicKey, targetName);
 
   return { ok: true, status: 202 };
+}
+
+export interface UpdateEmailResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+  email?: string;
+  verificationRequired?: boolean;
+}
+
+/**
+ * Update an agent's owner email.
+ *
+ * Two modes:
+ * 1. Admin override: callerAgent is an admin — updates email immediately, no verification.
+ * 2. Agent self-update: callerAgent matches targetName — requires email verification
+ *    for the NEW email (via /verify/send + /verify/confirm) before the update takes effect.
+ *
+ * The new email must not be a disposable domain and must not already be in use.
+ */
+export function updateAgentEmail(
+  db: Database.Database,
+  targetName: string,
+  newEmail: string,
+  callerAgent: string,
+): UpdateEmailResult {
+  if (!newEmail || typeof newEmail !== 'string') {
+    return { ok: false, status: 400, error: 'email is required' };
+  }
+
+  // Basic email format check
+  if (!newEmail.includes('@') || newEmail.length > 254) {
+    return { ok: false, status: 400, error: 'Invalid email format' };
+  }
+
+  // Check for disposable email
+  const domain = newEmail.split('@')[1]?.toLowerCase();
+  if (domain && DISPOSABLE_DOMAINS.has(domain)) {
+    return { ok: false, status: 400, error: 'Disposable email domains not allowed' };
+  }
+
+  // Look up target agent
+  const agent = db.prepare(
+    'SELECT name, owner_email, status FROM agents WHERE name = ?'
+  ).get(targetName) as { name: string; owner_email: string; status: string } | undefined;
+
+  if (!agent) {
+    return { ok: false, status: 404, error: 'Agent not found' };
+  }
+
+  if (agent.status !== 'active') {
+    return { ok: false, status: 403, error: 'Agent is not active' };
+  }
+
+  // No-op if email is the same
+  if (agent.owner_email === newEmail) {
+    return { ok: true, email: newEmail };
+  }
+
+  // Check uniqueness — no other agent should use this email
+  const emailExists = db.prepare(
+    'SELECT name FROM agents WHERE owner_email = ? AND name != ?'
+  ).get(newEmail, targetName);
+  if (emailExists) {
+    return { ok: false, status: 409, error: 'An agent with this email already exists' };
+  }
+
+  // Check if caller is an admin
+  const adminRow = db.prepare('SELECT agent FROM admins WHERE agent = ?').get(callerAgent) as
+    | { agent: string } | undefined;
+  const callerIsAdmin = !!adminRow;
+
+  if (callerIsAdmin) {
+    // Admin override — update immediately, no verification needed
+    db.prepare('UPDATE agents SET owner_email = ? WHERE name = ?').run(newEmail, targetName);
+    return { ok: true, email: newEmail };
+  }
+
+  // Agent self-update — caller must be the agent themselves
+  if (callerAgent !== targetName) {
+    return { ok: false, status: 403, error: 'Can only update your own email' };
+  }
+
+  // Require email verification for the NEW email
+  const verification = db.prepare(
+    'SELECT verified FROM email_verifications WHERE agent_name = ? AND email = ?'
+  ).get(targetName, newEmail) as { verified: number } | undefined;
+
+  if (!verification || !verification.verified) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'New email not verified — complete /verify/send and /verify/confirm for the new email first',
+      verificationRequired: true,
+    };
+  }
+
+  // Verified — update
+  db.prepare('UPDATE agents SET owner_email = ? WHERE name = ?').run(newEmail, targetName);
+  return { ok: true, email: newEmail };
 }

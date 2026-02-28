@@ -18,6 +18,7 @@ import {
   revokeAgent,
   rotateKey,
   recoverKey,
+  updateAgentEmail,
 } from './routes/registry.js';
 import {
   requestContact,
@@ -246,6 +247,17 @@ const server = createServer(async (req, res) => {
       if (!data) return json(res, 400, { error: 'Invalid JSON' });
       const result = recoverKey(db, params.name, data.ownerEmail, data.newPublicKey);
       return json(res, result.status || (result.ok ? 202 : 400), result);
+    }
+
+    // PUT /registry/agents/:name/email — update owner email (authenticated)
+    params = matchPath('/registry/agents/:name/email', path);
+    if (params && method === 'PUT') {
+      const a = auth();
+      if (!a.ok) return json(res, a.status || 401, { error: a.error });
+      const data = parseBody();
+      if (!data) return json(res, 400, { error: 'Invalid JSON' });
+      const result = updateAgentEmail(db, params.name, data.email, a.agent!);
+      return json(res, result.status || (result.ok ? 200 : 400), result);
     }
 
     // ==========================================================
